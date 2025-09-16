@@ -1,2 +1,1 @@
-# link-kanrikun
-# link-kanrikun
+# リンク管理くん
