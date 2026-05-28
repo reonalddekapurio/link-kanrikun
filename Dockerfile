@@ -9,4 +9,5 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 COPY ./src /workdir
-CMD ["python", "link_bot.py"]
+RUN chmod +x start.sh
+CMD ["./start.sh"]
