@@ -3,11 +3,21 @@ from discord.ext import commands
 import re
 import os
 from dotenv import load_dotenv
+from flask import Flask
+import threading
 exports = ['on_message']
 
 load_dotenv()
 
 TOKEN = os.environ.get('DISCORD_TOKEN')
+PORT = int(os.environ.get('PORT', 5000))
+
+# Flask app for keeping the server alive
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return {'status': 'ok'}, 200
 # Intentsの設定
 intents = discord.Intents.default()
 intents.message_content = True  # Message Content Intent を明示
@@ -52,7 +62,14 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
+def run_flask():
+    """Run Flask server in a separate thread"""
+    app.run(host='0.0.0.0', port=PORT, debug=False)
 
-        
+
+# Start Flask server in background thread
+flask_thread = threading.Thread(target=run_flask, daemon=True)
+flask_thread.start()
+
 bot.run(TOKEN)
 
