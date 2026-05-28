@@ -3,3 +3,5 @@ services:
     build: ./
     volumes:
       - ./src:/workdir
+    restart: unless-stopped
+

@@ -5,9 +5,16 @@ import os
 from dotenv import load_dotenv
 from flask import Flask
 import threading
+import asyncio
+import time
+import logging
 exports = ['on_message']
 
 load_dotenv()
+
+# ログ設定
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get('DISCORD_TOKEN')
 PORT = int(os.environ.get('PORT', 5000))
@@ -67,9 +74,36 @@ def run_flask():
     app.run(host='0.0.0.0', port=PORT, debug=False)
 
 
-# Start Flask server in background thread
-flask_thread = threading.Thread(target=run_flask, daemon=True)
-flask_thread.start()
+def run_bot_with_retry():
+    """Run bot with automatic restart on failure"""
+    max_retries = 5
+    retry_count = 0
+    base_wait_time = 5
+    
+    while retry_count < max_retries:
+        try:
+            logger.info(f"Botを起動しています... (試行 {retry_count + 1}/{max_retries})")
+            
+            # Start Flask server in background thread
+            flask_thread = threading.Thread(target=run_flask, daemon=True)
+            flask_thread.start()
+            logger.info("Flaskサーバーを起動しました")
+            
+            # Bot を実行
+            bot.run(TOKEN)
+            
+        except Exception as e:
+            retry_count += 1
+            wait_time = base_wait_time * (2 ** (retry_count - 1))
+            logger.error(f"Botが落ちました: {e}")
+            logger.info(f"{wait_time}秒後に再起動を試みます... (試行 {retry_count}/{max_retries})")
+            time.sleep(wait_time)
+    
+    logger.critical("最大再試行回数に達しました。ボットを停止します。")
 
-bot.run(TOKEN)
+
+# メイン処理
+if __name__ == "__main__":
+    run_bot_with_retry()
+
 
