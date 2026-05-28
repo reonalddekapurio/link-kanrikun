@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: link-kanrikun
+    runtime: docker
+    plan: free
+    healthCheckPath: /
