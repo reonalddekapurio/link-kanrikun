@@ -3,7 +3,3 @@ services:
     name: link-kanrikun
     runtime: docker
     plan: free
-    healthCheckPath: /
-    envVars:
-      - key: PORT
-        value: 10000
