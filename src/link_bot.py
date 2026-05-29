@@ -57,7 +57,6 @@ URL_REGEX = re.compile(r"https?://[^\s]+")
 
 
 def create_bot():
-    """Create a new bot instance"""
     bot = commands.Bot(command_prefix="!", intents=intents)
     
     @bot.event
@@ -97,7 +96,6 @@ def create_bot():
 
 
 def run_flask():
-    """Flask サーバーを別スレッドで実行"""
     try:
         logger.info(f"Flaskサーバーをポート {PORT} で起動しています...")
         app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
@@ -107,7 +105,6 @@ def run_flask():
 
 
 def keep_alive_ping():
-    """Keep-alive ping を定期的に送信（オプション）"""
     if not SERVICE_URL:
         logger.info("SERVICE_URLが未設定のためkeep-aliveなし")
         return
@@ -116,7 +113,7 @@ def keep_alive_ping():
     
     while True:
         try:
-            time.sleep(300)  # 5分ごと
+            time.sleep(300)
             urlopen(SERVICE_URL, timeout=5)
             logger.debug("keep-alive ping送信")
         except Exception as e:
@@ -124,11 +121,9 @@ def keep_alive_ping():
 
 
 async def run_bot_with_login_timeout(bot_instance, token, timeout_seconds=60):
-    """ログインをタイムアウト付きで実行"""
     login_task = asyncio.create_task(bot_instance.start(token))
     
     try:
-        # タイムアウト付きでログインを待機
         await asyncio.wait_for(login_task, timeout=timeout_seconds)
     except asyncio.TimeoutError:
         logger.error(f"ログインタイムアウト ({timeout_seconds}秒)")
@@ -140,32 +135,28 @@ async def run_bot_with_login_timeout(bot_instance, token, timeout_seconds=60):
 
 
 def run_bot_with_retry():
-    """自動リスタート機能付きでボットを実行"""
     global retry_count, bot
     
-    max_retries = float('inf')  # 無制限にリトライ
+    max_retries = float('inf')
     retry_count = 0
-    base_wait_time = 60  # 基本待機時間
+    base_wait_time = 60
     
     while True:
         try:
             logger.info(f"[Bot] ボット起動処理開始 (試行回数: {retry_count})")
             
-            # Flaskサーバーをバックグラウンドで起動
+
             flask_thread = threading.Thread(target=run_flask, daemon=True)
             flask_thread.start()
             logger.info("Flaskサーバーが起動しました")
             
-            # Keep-aliveを別スレッドで起動（オプション）
             if SERVICE_URL:
                 keep_alive_thread = threading.Thread(target=keep_alive_ping, daemon=True)
                 keep_alive_thread.start()
             
-            # ボットインスタンスを作成
             bot = create_bot()
             logger.info("ボットインスタンスを作成しました")
             
-            # ボットを起動
             logger.info("client.login() 実行中...")
             bot.run(TOKEN)
             
@@ -174,7 +165,7 @@ def run_bot_with_retry():
             sys.exit(0)
         except Exception as e:
             retry_count += 1
-            # 指数バックオフ（最大10分）
+
             wait_time = min(600, base_wait_time * (2 ** (retry_count - 1)))
             logger.error(f"[Bot] ボットが落ちました: {e}")
             logger.error(traceback.format_exc())
@@ -200,7 +191,6 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
 sys.excepthook = handle_unhandled_exception
 
 
-# メイン処理
 if __name__ == "__main__":
     logger.info("=" * 50)
     logger.info("Discord Bot を起動します")
