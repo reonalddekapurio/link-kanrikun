@@ -52,15 +52,32 @@ bot = None
 
 LINK_CATEGORIES = ["リンクメモ"]
 
+
+class BotClient(commands.Bot):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_closed = False
+    
+    async def on_disconnect(self):
+        logger.warning("ボットが切断されました。再接続を試みています...")
+    
+    async def on_error(self, event, *args, **kwargs):
+        logger.error(f"イベントエラー ({event}): {sys.exc_info()}")
+        logger.error(traceback.format_exc())
+
 URL_REGEX = re.compile(r"https?://[^\s]+")
 
 
 def create_bot():
-    bot = commands.Bot(command_prefix="!", intents=intents)
+    bot = BotClient(command_prefix="!", intents=intents)
     
     @bot.event
     async def on_ready():
-        logger.info(f'Botがログインしました: {bot.user}')
+        logger.info(f'✅ Botがログインしました: {bot.user}')
+        try:
+            await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="サーバー"))
+        except Exception as e:
+            logger.warning(f"ステータス設定失敗: {e}")
     
     @bot.command()
     async def text(ctx, amount: int):
@@ -85,11 +102,6 @@ def create_bot():
                 else:
                     temp = message.content
         await bot.process_commands(message)
-    
-    @bot.event
-    async def on_error(event, *args, **kwargs):
-        logger.error(f"イベントエラー ({event}): {sys.exc_info()}")
-        logger.error(traceback.format_exc())
     
     return bot
 
@@ -120,17 +132,13 @@ def keep_alive_ping():
             logger.warning(f"keep-alive失敗: {e}")
 
 
-async def run_bot_with_login_timeout(bot_instance, token, timeout_seconds=60):
-    login_task = asyncio.create_task(bot_instance.start(token))
-    
+async def run_bot_async(bot_instance, token):
+    """非同期でボットを実行"""
     try:
-        await asyncio.wait_for(login_task, timeout=timeout_seconds)
-    except asyncio.TimeoutError:
-        logger.error(f"ログインタイムアウト ({timeout_seconds}秒)")
-        await bot_instance.close()
-        raise Exception("ログインタイムアウト")
+        await bot_instance.start(token)
     except Exception as e:
-        logger.error(f"ログイン中にエラー: {e}")
+        logger.error(f"ボット実行エラー: {e}")
+        logger.error(traceback.format_exc())
         raise
 
 
@@ -139,37 +147,40 @@ def run_bot_with_retry():
     
     max_retries = float('inf')
     retry_count = 0
-    base_wait_time = 60
+    base_wait_time = 30
+    
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info("Flaskサーバーが起動しました")
+    
+    if SERVICE_URL:
+        keep_alive_thread = threading.Thread(target=keep_alive_ping, daemon=True)
+        keep_alive_thread.start()
     
     while True:
         try:
+            retry_count += 1
             logger.info(f"[Bot] ボット起動処理開始 (試行回数: {retry_count})")
-            
-
-            flask_thread = threading.Thread(target=run_flask, daemon=True)
-            flask_thread.start()
-            logger.info("Flaskサーバーが起動しました")
-            
-            if SERVICE_URL:
-                keep_alive_thread = threading.Thread(target=keep_alive_ping, daemon=True)
-                keep_alive_thread.start()
             
             bot = create_bot()
             logger.info("ボットインスタンスを作成しました")
             
-            logger.info("client.login() 実行中...")
-            bot.run(TOKEN)
+            logger.info("ボットをスタート中...")
+            
+            asyncio.run(run_bot_async(bot, TOKEN))
             
         except KeyboardInterrupt:
             logger.info("キーボード割り込みを受信しました。ボットを停止します。")
             sys.exit(0)
+        except asyncio.CancelledError:
+            logger.info("ボット実行がキャンセルされました")
+            time.sleep(30)
         except Exception as e:
-            retry_count += 1
-
-            wait_time = min(600, base_wait_time * (2 ** (retry_count - 1)))
             logger.error(f"[Bot] ボットが落ちました: {e}")
             logger.error(traceback.format_exc())
-            logger.info(f"{wait_time}秒後にリトライを試みます... (試行: {retry_count})")
+            
+            wait_time = min(600, base_wait_time * (2 ** (retry_count - 1)))
+            logger.info(f"🔄 {wait_time}秒後にリトライを試みます... (試行: {retry_count})")
             
             try:
                 time.sleep(wait_time)
@@ -178,7 +189,6 @@ def run_bot_with_retry():
                 sys.exit(0)
 
 
-# 未処理の例外をキャッチ
 def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
