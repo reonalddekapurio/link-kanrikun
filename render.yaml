@@ -1,5 +1,10 @@
 services:
   - type: web
     name: link-kanrikun
-    runtime: docker
+    runtime: python-3.11
     plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 src/link_bot.py
+    envVars:
+      - key: PORT
+        value: 5000

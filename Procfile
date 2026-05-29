@@ -1,1 +1,1 @@
-web: cd src && python3 link_bot.py
+web: python3 src/link_bot.py

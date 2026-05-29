@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
-PORT = int(os.environ.get('PORT', 10000))
+PORT = int(os.environ.get('PORT', 5000))
 SERVICE_URL = os.environ.get('SERVICE_URL')
 
 logger.info(f"TOKEN exists: {bool(TOKEN)}")
@@ -98,7 +98,8 @@ def create_bot():
 def run_flask():
     try:
         logger.info(f"Flaskサーバーをポート {PORT} で起動しています...")
-        app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
+        logger.info(f"アクセスURL: http://0.0.0.0:{PORT}")
+        app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False, threaded=True)
     except Exception as e:
         logger.error(f"Flaskサーバーエラー: {e}")
         logger.error(traceback.format_exc())
