@@ -53,23 +53,11 @@ bot = None
 LINK_CATEGORIES = ["リンクメモ"]
 
 
-class BotClient(commands.Bot):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.is_closed = False
-    
-    async def on_disconnect(self):
-        logger.warning("ボットが切断されました。再接続を試みています...")
-    
-    async def on_error(self, event, *args, **kwargs):
-        logger.error(f"イベントエラー ({event}): {sys.exc_info()}")
-        logger.error(traceback.format_exc())
-
 URL_REGEX = re.compile(r"https?://[^\s]+")
 
 
 def create_bot():
-    bot = BotClient(command_prefix="!", intents=intents)
+    bot = commands.Bot(command_prefix="!", intents=intents)
     
     @bot.event
     async def on_ready():
@@ -78,6 +66,15 @@ def create_bot():
             await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="サーバー"))
         except Exception as e:
             logger.warning(f"ステータス設定失敗: {e}")
+    
+    @bot.event
+    async def on_disconnect():
+        logger.warning("ボットが切断されました。再接続を試みています...")
+    
+    @bot.event
+    async def on_error(event, *args, **kwargs):
+        logger.error(f"イベントエラー ({event}): {sys.exc_info()}")
+        logger.error(traceback.format_exc())
     
     @bot.command()
     async def text(ctx, amount: int):
